@@ -1,0 +1,30 @@
+{
+  "name": "tpak/carpooling",
+  "description": "Application de covoiturage - Touche pas au Klaxon",
+  "type": "project",
+  "require": {
+    "php": ">=8.1",
+    "vlucas/phpdotenv": "^5.6",
+    "izniburak/router": "^2.5",
+    "ext-pdo": "*"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.5",
+    "phpstan/phpstan": "^1.11"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "app/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit",
+    "phpstan": "phpstan analyse -c phpstan.neon",
+    "serve": "php -S localhost:8000 -t public"
+  }
+}
