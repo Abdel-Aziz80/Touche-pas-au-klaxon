@@ -1,0 +1,19 @@
+# Front controller pour router toutes les URLs vers public/index.php
+RewriteEngine On
+RewriteBase /
+
+# Pas d’index de dossier
+Options -Indexes
+
+# Protéger quelques fichiers sensibles
+<FilesMatch "(\.env|composer\.(json|lock)|\.gitignore|\.htaccess)">
+  Require all denied
+</FilesMatch>
+
+# Laisser passer les fichiers/dossiers réels
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Sinon tout vers index.php
+RewriteRule ^ index.php [QSA,L]

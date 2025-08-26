@@ -1,0 +1,9 @@
+# Désactiver l'index des dossiers
+Options -Indexes
+
+# Rediriger toute requête vers /public, sans casser les fichiers existants
+RewriteEngine On
+
+# Si on n'est pas déjà dans /public, on y envoie
+RewriteCond %{REQUEST_URI} !^/public/
+RewriteRule ^(.*)$ public/$1 [L]

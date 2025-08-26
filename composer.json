@@ -6,11 +6,13 @@
     "php": ">=8.1",
     "vlucas/phpdotenv": "^5.6",
     "izniburak/router": "^2.5",
+    "monolog/monolog": "^3.6",
     "ext-pdo": "*"
   },
   "require-dev": {
     "phpunit/phpunit": "^10.5",
-    "phpstan/phpstan": "^1.11"
+    "phpstan/phpstan": "^1.11",
+    "friendsofphp/php-cs-fixer": "^3.59"
   },
   "autoload": {
     "psr-4": {
@@ -23,8 +25,21 @@
     }
   },
   "scripts": {
-    "test": "phpunit",
-    "phpstan": "phpstan analyse -c phpstan.neon",
-    "serve": "php -S localhost:8000 -t public"
-  }
+    "serve": "php -S localhost:8000 -t public",
+    "test": "phpunit --colors=always",
+    "stan": "phpstan analyse -c phpstan.neon",
+    "cs:fix": "php-cs-fixer fix --allow-risky=yes",
+    "cs:check": "php-cs-fixer fix --dry-run --diff --allow-risky=yes",
+    "qa": [
+      "@cs:check",
+      "@stan",
+      "@test"
+    ]
+  },
+  "config": {
+    "sort-packages": true,
+    "optimize-autoloader": true,
+    "preferred-install": "dist"
+  },
+  "prefer-stable": true
 }
