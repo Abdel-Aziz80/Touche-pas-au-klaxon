@@ -1,54 +1,82 @@
 <?php
 declare(strict_types=1);
 
+// 👇 debug visible
+ini_set('display_errors','1');
+ini_set('display_startup_errors','1');
+error_reporting(E_ALL);
+ob_implicit_flush(true);
+
+
+
 use Buki\Router\Router;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
+
 
 $root = dirname(__DIR__);
 
 // Env
 $dotenv = Dotenv\Dotenv::createImmutable($root);
 $dotenv->safeLoad();
+
 if (empty($_ENV['DB_DSN'])) { die('ENV non chargé: vérifier le .env à la racine.'); }
-// Simple container (ex: PDO)
+
+// PDO (container simplifié)
 $pdo = (function () {
     $dsn  = $_ENV['DB_DSN']  ?? '';
     $user = $_ENV['DB_USER'] ?? '';
     $pass = $_ENV['DB_PASS'] ?? '';
-    $pdo  = new PDO($dsn, $user, $pass, [
-        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    ]);
-    return $pdo;
+    try {
+        return new PDO($dsn, $user, $pass, [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
+    } catch (Throwable $e) {
+        http_response_code(500);
+        die('Erreur connexion DB: ' . $e->getMessage());
+    }
 })();
 
-// Flash helper (session)
+$logDir = $root . '/storage/logs';
+if (!is_dir($logDir)) { @mkdir($logDir, 0775, true); }
+
+$logger = new Monolog\Logger('tpak');
+$logger->pushHandler(new Monolog\Handler\StreamHandler($logDir.'/app.log', Monolog\Level::Info));
+
+App\Helpers\Registry::set('logger', $logger);
+
 session_start();
 
 $router = new Router([
     'paths' => [
-        'controllers' => '../app/Controllers',
-        'middlewares' => '../app/Middlewares',
+        'controllers' => $root . '/app/Controllers',
+        'middlewares' => $root . '/app/Middlewares',
     ],
     'namespaces' => [
         'controllers' => 'App\\Controllers',
         'middlewares' => 'App\\Middlewares',
-    ]
+    ],
+    // 'base_folder' => '/Touche pas au klaxon/public',
 ]);
 
-// Injection simple via singleton (à remplacer par un vrai container si tu veux)
+
+// Injection simple
+// ⚠️ Si la classe Registry n'existe pas encore, commente ces 2 lignes et reteste
 App\Helpers\Registry::set('pdo', $pdo);
 App\Helpers\Registry::set('views_path', $root . '/ressources/views');
 
-// Routes
 require $root . '/config/routes.php';
 
-// 404
+
+// Route de test (au cas où routes.php est vide)
+$router->get('/ping', function () { echo 'pong'; });
+
 $router->error(function() {
     http_response_code(404);
     echo '404 Not Found';
 });
 
-// Run
+
 $router->run();
+

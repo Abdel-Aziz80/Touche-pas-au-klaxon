@@ -1,9 +1,13 @@
 <?php
+
+
 declare(strict_types=1);
+
 
 /** @var \Buki\Router\Router $router */
 
 $router->get('/', 'HomeController@index');
+
 
 // Auth
 $router->get('/login', 'AuthController@showLogin');
@@ -12,14 +16,14 @@ $router->get('/logout', 'AuthController@logout');
 
 // Trips
 $router->get('/trips', 'TripController@index');
-$router->get('/trips/create', 'TripController@create')->middleware('AuthMiddleware');
-$router->post('/trips', 'TripController@store')->middleware('AuthMiddleware');
-$router->get('/trips/{id}/edit', 'TripController@edit')->middleware('AuthMiddleware');
-$router->post('/trips/{id}/update', 'TripController@update')->middleware('AuthMiddleware');
-$router->post('/trips/{id}/delete', 'TripController@destroy')->middleware('AuthMiddleware');
+$router->get('/trips/create', 'TripController@create', ['before' => 'AuthMiddleware']);
+$router->post('/trips', 'TripController@store', ['before' => 'AuthMiddleware']);
+$router->get('/trips/{id}/edit', 'TripController@edit', ['before' => 'AuthMiddleware']);
+$router->post('/trips/{id}/update', 'TripController@update', ['before' => 'AuthMiddleware']);
+$router->post('/trips/{id}/delete', 'TripController@destroy', ['before' => 'AuthMiddleware']);
 
 // Admin
-$router->group('admin', function($router) {
+$router->group('/admin', function($router) {
     $router->get('/', 'AdminController@dashboard');
     $router->get('/agencies', 'AgencyController@index');
     $router->get('/agencies/create', 'AgencyController@create');
@@ -30,4 +34,4 @@ $router->group('admin', function($router) {
 
     $router->get('/users', 'AdminController@users');
     $router->get('/trips', 'AdminController@trips');
-})->middleware('AdminMiddleware');
+}, ['before' => 'AdminMiddleware']);
