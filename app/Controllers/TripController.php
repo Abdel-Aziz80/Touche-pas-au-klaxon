@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Helpers\Auth;
 use App\Helpers\Csrf;
 use App\Helpers\Flash;
 use App\Helpers\Registry;
@@ -13,135 +14,231 @@ final class TripController
 {
     private PDO $pdo;
     private string $views;
+
     public function __construct()
     {
-        $this->pdo = Registry::get('pdo');
+        $this->pdo   = Registry::get('pdo');
         $this->views = Registry::get('views_path');
     }
 
     public function index(): void
     {
-        $sql = "SELECT t.id, fa.name AS from_agency, ta.name AS to_agency,
-                   t.departure_at, t.arrival_at, t.seats_left, t.price
+        $sql = "
+            SELECT
+                t.id,
+                fa.name AS from_agency,
+                ta.name AS to_agency,
+                t.depart_at,
+                t.arrive_at,
+                t.seats_total,
+                t.seats_available
             FROM trips t
-            JOIN agencies fa ON fa.id=t.from_agency_id
-            JOIN agencies ta ON ta.id=t.to_agency_id
-            ORDER BY t.departure_at ASC";
+            JOIN agencies fa ON fa.id = t.agency_from_id
+            JOIN agencies ta ON ta.id = t.agency_to_id
+            ORDER BY t.depart_at ASC
+        ";
         $trips = $this->pdo->query($sql)->fetchAll();
+
         $title = 'Trajets';
         ob_start();
         $data = compact('trips');
-        extract($data);
-        require $this->views.'/trips/index.php';
-        $content = (string)ob_get_clean();
-        require $this->views.'/layouts/header.php';
+        extract($data, EXTR_SKIP);
+        require $this->views . '/trips/index.php';
+        $content = (string) ob_get_clean();
+
+        require $this->views . '/layouts/header.php';
         echo $content;
-        require $this->views.'/layouts/footer.php';
+        require $this->views . '/layouts/footer.php';
     }
 
     public function create(): void
     {
-        $agencies = $this->pdo->query("SELECT id,name FROM agencies ORDER BY name")->fetchAll();
+        $agencies = $this->pdo->query("SELECT id, name FROM agencies ORDER BY name")->fetchAll();
+
         $title = 'Nouveau trajet';
         ob_start();
         $data = compact('agencies');
-        extract($data);
-        require $this->views.'/trips/create.php';
-        $content = (string)ob_get_clean();
-        require $this->views.'/layouts/header.php';
+        extract($data, EXTR_SKIP);
+        require $this->views . '/trips/create.php';
+        $content = (string) ob_get_clean();
+
+        require $this->views . '/layouts/header.php';
         echo $content;
-        require $this->views.'/layouts/footer.php';
+        require $this->views . '/layouts/footer.php';
     }
 
     public function store(): void
     {
         if (!Csrf::check($_POST['csrf'] ?? null)) {
             Flash::add('danger', 'Session expirée.');
-            header('Location:/trips/create');
-            exit;
-        }
-        $from = (int)($_POST['from_agency_id'] ?? 0);
-        $to = (int)($_POST['to_agency_id'] ?? 0);
-        $dep = trim($_POST['departure_at'] ?? '');
-        $arr = trim($_POST['arrival_at'] ?? '');
-        $seats = max(0, (int)($_POST['seats_left'] ?? 0));
-        $price = (float)($_POST['price'] ?? 0);
-        if ($from <= 0 || $to <= 0 || $from === $to || $dep === '' || $arr === '') {
-            Flash::add('danger', 'Champs invalides.');
-            header('Location:/trips/create');
+            header('Location: /trips/create');
             exit;
         }
 
-        $stmt = $this->pdo->prepare("INSERT INTO trips (from_agency_id,to_agency_id,departure_at,arrival_at,seats_left,price)
-                               VALUES (?,?,?,?,?,?)");
-        $stmt->execute([$from,$to,$dep,$arr,$seats,$price]);
+        $user = Auth::user();
+        $authorId = (int) ($user['id'] ?? 0);
+        if ($authorId <= 0) {
+            Flash::add('danger', 'Vous devez être connecté.');
+            header('Location: /login');
+            exit;
+        }
+
+        $from  = (int) ($_POST['agency_from_id'] ?? 0);
+        $to    = (int) ($_POST['agency_to_id'] ?? 0);
+        $dep   = trim((string) ($_POST['depart_at'] ?? ''));   // format: YYYY-MM-DD HH:MM:SS
+        $arr   = trim((string) ($_POST['arrive_at'] ?? ''));   // idem
+        $total = max(1, (int) ($_POST['seats_total'] ?? 1));   // 1..9
+        $avail = max(0, (int) ($_POST['seats_available'] ?? 0));
+        $cName = trim((string) ($_POST['contact_name'] ?? ''));
+        $cPhone = trim((string) ($_POST['contact_phone'] ?? ''));
+        $cMail = trim((string) ($_POST['contact_email'] ?? ''));
+
+        // validations côté app, cohérentes avec les CHECK de la DB
+        $errors = [];
+        if ($from <= 0 || $to <= 0 || $from === $to) {
+            $errors[] = 'Agences invalides.';
+        }
+        if ($dep === '' || $arr === '' || (strtotime($arr) <= strtotime($dep))) {
+            $errors[] = 'Dates invalides (arrivée > départ).';
+        }
+        if ($total > 9) { $errors[] = 'Nombre total de sièges: 1..9.'; }
+
+        if ($avail > $total) { $errors[] = 'Sièges disponibles incohérents.'; }
+
+        if ($cName === '' || $cPhone === '' || !filter_var($cMail, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'Contacts incomplets/invalides.';
+        }
+
+        if ($errors !== []) {
+            Flash::add('danger', implode(' ', $errors));
+            header('Location: /trips/create');
+            exit;
+        }
+
+        $sql = "
+            INSERT INTO trips
+                (author_id, agency_from_id, agency_to_id, depart_at, arrive_at,
+                 seats_total, seats_available, contact_name, contact_phone, contact_email)
+            VALUES
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            $authorId, $from, $to, $dep, $arr,
+            $total, $avail, $cName, $cPhone, $cMail,
+        ]);
+
         Flash::add('success', 'Trajet créé.');
-        header('Location:/trips');
+        header('Location: /trips');
         exit;
     }
 
-    public function edit(int|string $id): void
+    public function edit(string $id): void
     {
-        $id = (int)$id;
-        $trip = $this->pdo->prepare("SELECT * FROM trips WHERE id=?");
-        $trip->execute([$id]);
-        $trip = $trip->fetch();
+        $tripId = (int) $id;
+
+        $stmt = $this->pdo->prepare("SELECT * FROM trips WHERE id = ?");
+        $stmt->execute([$tripId]);
+        $trip = $stmt->fetch();
+
         if (!$trip) {
             http_response_code(404);
             echo 'Trajet introuvable';
             return;
         }
-        $agencies = $this->pdo->query("SELECT id,name FROM agencies ORDER BY name")->fetchAll();
+
+        $agencies = $this->pdo->query("SELECT id, name FROM agencies ORDER BY name")->fetchAll();
+
         $title = 'Éditer trajet';
         ob_start();
         $data = compact('trip', 'agencies');
-        extract($data);
-        require $this->views.'/trips/edit.php';
-        $content = (string)ob_get_clean();
-        require $this->views.'/layouts/header.php';
+        extract($data, EXTR_SKIP);
+        require $this->views . '/trips/edit.php';
+        $content = (string) ob_get_clean();
+
+        require $this->views . '/layouts/header.php';
         echo $content;
-        require $this->views.'/layouts/footer.php';
+        require $this->views . '/layouts/footer.php';
     }
 
-    public function update(int|string $id): void
+    public function update(string $id): void
     {
         if (!Csrf::check($_POST['csrf'] ?? null)) {
             Flash::add('danger', 'Session expirée.');
-            header("Location:/trips/{$id}/edit");
-            exit;
-        }
-        $id = (int)$id;
-        $from = (int)($_POST['from_agency_id'] ?? 0);
-        $to = (int)($_POST['to_agency_id'] ?? 0);
-        $dep = trim($_POST['departure_at'] ?? '');
-        $arr = trim($_POST['arrival_at'] ?? '');
-        $seats = max(0, (int)($_POST['seats_left'] ?? 0));
-        $price = (float)($_POST['price'] ?? 0);
-        if ($from <= 0 || $to <= 0 || $from === $to || $dep === '' || $arr === '') {
-            Flash::add('danger', 'Champs invalides.');
-            header("Location:/trips/{$id}/edit");
+            header("Location: /trips/{$id}/edit");
             exit;
         }
 
-        $stmt = $this->pdo->prepare("UPDATE trips SET from_agency_id=?,to_agency_id=?,departure_at=?,arrival_at=?,seats_left=?,price=? WHERE id=?");
-        $stmt->execute([$from,$to,$dep,$arr,$seats,$price,$id]);
+        $tripId = (int) $id;
+
+        $from  = (int) ($_POST['agency_from_id'] ?? 0);
+        $to    = (int) ($_POST['agency_to_id'] ?? 0);
+        $dep   = trim((string) ($_POST['depart_at'] ?? ''));
+        $arr   = trim((string) ($_POST['arrive_at'] ?? ''));
+        $total = max(1, (int) ($_POST['seats_total'] ?? 1));
+        $avail = max(0, (int) ($_POST['seats_available'] ?? 0));
+        $cName = trim((string) ($_POST['contact_name'] ?? ''));
+        $cPhone = trim((string) ($_POST['contact_phone'] ?? ''));
+        $cMail = trim((string) ($_POST['contact_email'] ?? ''));
+
+        $errors = [];
+        if ($from <= 0 || $to <= 0 || $from === $to) {
+            $errors[] = 'Agences invalides.';
+        }
+        if ($dep === '' || $arr === '' || (strtotime($arr) <= strtotime($dep))) {
+            $errors[] = 'Dates invalides (arrivée > départ).';
+        }
+        if ($total > 9) { $errors[] = 'Nombre total de sièges: 1..9.'; }
+
+        if ($avail > $total) { $errors[] = 'Sièges disponibles incohérents.'; }
+        
+        if ($cName === '' || $cPhone === '' || !filter_var($cMail, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'Contacts incomplets/invalides.';
+        }
+
+        if ($errors !== []) {
+            Flash::add('danger', implode(' ', $errors));
+            header("Location: /trips/{$id}/edit");
+            exit;
+        }
+
+        $sql = "
+            UPDATE trips SET
+                agency_from_id = ?,
+                agency_to_id = ?,
+                depart_at = ?,
+                arrive_at = ?,
+                seats_total = ?,
+                seats_available = ?,
+                contact_name = ?,
+                contact_phone = ?,
+                contact_email = ?
+            WHERE id = ?
+        ";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            $from, $to, $dep, $arr, $total, $avail, $cName, $cPhone, $cMail, $tripId,
+        ]);
+
         Flash::add('success', 'Trajet mis à jour.');
-        header('Location:/trips');
+        header('Location: /trips');
         exit;
     }
 
-    public function destroy(int|string $id): void
+    public function destroy(string $id): void
     {
         if (!Csrf::check($_POST['csrf'] ?? null)) {
             Flash::add('danger', 'Session expirée.');
-            header('Location:/trips');
+            header('Location: /trips');
             exit;
         }
-        $id = (int)$id;
-        $stmt = $this->pdo->prepare("DELETE FROM trips WHERE id=?");
-        $stmt->execute([$id]);
+
+        $tripId = (int) $id;
+        $stmt = $this->pdo->prepare("DELETE FROM trips WHERE id = ?");
+        $stmt->execute([$tripId]);
+
         Flash::add('success', 'Trajet supprimé.');
-        header('Location:/trips');
+        header('Location: /trips');
         exit;
     }
 }

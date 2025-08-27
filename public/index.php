@@ -46,6 +46,12 @@ $logger->pushHandler(new Monolog\Handler\StreamHandler($logDir.'/app.log', Monol
 
 App\Helpers\Registry::set('logger', $logger);
 
+ini_set('session.cookie_httponly','1');
+ini_set('session.use_strict_mode','1');
+ini_set('session.cookie_samesite','Lax');
+// en prod derrière HTTPS :
+// ini_set('session.cookie_secure','1');
+
 session_start();
 
 $router = new Router([
@@ -57,6 +63,7 @@ $router = new Router([
         'controllers' => 'App\\Controllers',
         'middlewares' => 'App\\Middlewares',
     ],
+     // important si l’app n’est pas à la racine du vhost
     // 'base_folder' => '/Touche pas au klaxon/public',
 ]);
 
