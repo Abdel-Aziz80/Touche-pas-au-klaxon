@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit
+    bootstrap="tests/bootstrap.php"
+    colors="true"
+    cacheDirectory=".phpunit.cache"
+    failOnEmptyTestSuite="true"
+    beStrictAboutOutputDuringTests="true"
+    beStrictAboutCoverageMetadata="true"
+>
+  <testsuites>
+    <testsuite name="Unit">
+      <directory>tests</directory>
+    </testsuite>
+  </testsuites>
+
+  <!-- Active la collecte de couverture (config de report optionnelle) -->
+  <coverage />
+
+  <!-- Filtrage des sources analysées -->
+  <source>
+    <include>
+      <directory suffix=".php">app</directory>
+    </include>
+  </source>
+</phpunit>

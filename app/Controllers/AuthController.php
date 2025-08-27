@@ -51,7 +51,7 @@ final class AuthController
             exit;
         }
 
-        // Ta table a une colonne `password`
+        // La table a une colonne `password`
         $stmt = $this->pdo->prepare('SELECT id, email, role, password FROM users WHERE email = ? LIMIT 1');
         $stmt->execute([$email]);
         $user = $stmt->fetch();

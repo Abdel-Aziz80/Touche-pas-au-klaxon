@@ -1,42 +1,49 @@
+<?php /** @var array $agencies */ ?>
 <h1>Nouveau trajet</h1>
-<form method="post" action="/trips">
+
+<form action="/trips" method="post">
   <input type="hidden" name="csrf" value="<?= \App\Helpers\Csrf::token() ?>">
 
-  <div>
-    <label>Agence départ
-      <select name="from_agency_id" required>
-        <option value="">--</option>
-        <?php foreach ($agencies as $a): ?>
-          <option value="<?= (int)$a['id'] ?>"><?= htmlspecialchars($a['name']) ?></option>
-        <?php endforeach; ?>
-      </select>
-    </label>
-  </div>
+  <label>De
+    <select name="agency_from_id" required>
+      <option value="">--</option>
+      <?php foreach ($agencies as $a): ?>
+        <option value="<?= (int)$a['id'] ?>"><?= htmlspecialchars($a['name']) ?></option>
+      <?php endforeach; ?>
+    </select>
+  </label>
 
-  <div>
-    <label>Agence arrivée
-      <select name="to_agency_id" required>
-        <option value="">--</option>
-        <?php foreach ($agencies as $a): ?>
-          <option value="<?= (int)$a['id'] ?>"><?= htmlspecialchars($a['name']) ?></option>
-        <?php endforeach; ?>
-      </select>
-    </label>
-  </div>
+  <label>Vers
+    <select name="agency_to_id" required>
+      <option value="">--</option>
+      <?php foreach ($agencies as $a): ?>
+        <option value="<?= (int)$a['id'] ?>"><?= htmlspecialchars($a['name']) ?></option>
+      <?php endforeach; ?>
+    </select>
+  </label>
 
-  <div>
-    <label>Départ (YYYY-MM-DD HH:MM)
-      <input type="text" name="departure_at" placeholder="2025-09-01 08:00" required>
-    </label>
-  </div>
+  <label>Départ
+    <input type="datetime-local" name="depart_at" required>
+  </label>
 
-  <div>
-    <label>Arrivée (YYYY-MM-DD HH:MM)
-      <input type="text" name="arrival_at" placeholder="2025-09-01 10:00" required>
-    </label>
-  </div>
+  <label>Arrivée
+    <input type="datetime-local" name="arrive_at" required>
+  </label>
 
-  <div><label>Places <input type="number" name="seats_left" min="0" value="1" required></label></div>
-  <div><label>Prix (€) <input type="number" name="price" step="0.01" min="0" value="0"></label></div>
+  <label>Places totales (1..9)
+    <input type="number" name="seats_total" min="1" max="9" required>
+  </label>
+
+  <label>Places dispo
+    <input type="number" name="seats_available" min="0" max="9" required>
+  </label>
+
+  <fieldset>
+    <legend>Contact</legend>
+    <label>Nom <input type="text" name="contact_name" required></label>
+    <label>Téléphone <input type="text" name="contact_phone" required></label>
+    <label>Email <input type="email" name="contact_email" required></label>
+  </fieldset>
+
   <button type="submit">Créer</button>
 </form>

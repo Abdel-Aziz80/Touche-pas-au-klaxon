@@ -1,8 +1,24 @@
+﻿# --- Dépendances
 /vendor/
-/var/
-/storage/logs/
+
+# --- Env & secrets
 .env
-.php-cs-fixer.cache
-.phpunit.result.cache
-.idea/
-.vscode/
+.env.local
+.env.*.local
+.env.*.secret
+!.env.example
+
+# --- Caches/outils QA
+/.php-cs-fixer.cache
+/.phpunit.cache
+/.phpunit.result.cache
+/.phpstan
+
+# --- Tests & rapports
+/coverage/
+
+# --- IDE & OS
+/.idea/
+/.vscode/
+.DS_Store
+Thumbs.db
